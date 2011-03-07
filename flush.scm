@@ -1,5 +1,6 @@
 #lang scheme
 
+(provide (all-defined-out))
 (define *suits* '(H D S C))
 (define *ranks* '(A K Q J 10 9 8 7 6 5 4 3 2 ))
 
@@ -134,22 +135,21 @@
       ((n) #f)
       (else (usery/n)))))
 
-(define (user-play/fold/show)
+(define (input-play/fold/show)
   (display "Please input p, f or s: " )
   (let ((input (read)))
     (case input
       ((or p f s) input)
-      (else (user-play/fold/show)))))
-
+      (else (input-play/fold/show)))))
 
 (define (input-user-number text min max)
   (display (string-append text " ( "  (number->string min) " - " (number->string max) "): "))
   (let ((input (read)))
     (if (number? input)
-	(if (and (> input min ) (> max input ))
+	(if (and (>= input min ) (>= max input ))
 	    input
-	    (input-user-number min max))
-	(input-user-number min max))))
+	    (input-user-number text min max))
+	(input-user-number text min max))))
 
 (define (input-userbet min  max)
   (input-user-number "How much do you want to bet?" min max))
@@ -159,12 +159,16 @@
 
 (define usercash 500)
 (define minbet 10)
-(define computercash (make-hash))
 
 (define (remove-hands h d)
   (if (null? h)
       d
       (remove-hands (cdr h) (remove (car h) d))))
+
+(define (winsall hs)
+  (filter (lambda (h)
+	    (andmap (lambda (opp) (wins h opp)) (remove h hs)))
+	  hs))
 
 (define (simulate numb opps hand won)
   (if (= numb 0) 
@@ -176,66 +180,10 @@
 
 ;; willingness to play is directly prop to no of sims won
 ;; willnigness to play is inversely directly prop to percent of bet. 
-
 (define *sims* 1000)
 
 (define (play? h opps bet cash)
   (< .9 (/ (/ (simulate *sims*  opps h 0) *sims*) (/ bet cash))))
-
-(define initialcash 500)
-
-(define (playround n)	
-  (display (string-append "Your current cash: " (number->string usercash)))
-  (display "Dealing")
-  (let ((hs (distribute-cards n)))
-    (playloop (map (lambda (i h) (playerstate i initialcash h #t))
-		   (interval 0 n) hs))))
-
-(define (numb-playing states)
-  (length (filter cadddr states)))
-
-(define (playloop states)
-  (let  ((ustate (car states)))
-    (cond 
-     ((= (numb-playing (cdr states)) 1) 'win)
-     ((cadddr ustate) 
-      (begin
-	(display "Your hand:")
-	(display (caddr ustate))
-	(display (string-append "Your current cash: " (number->string (cadr ustate))))
-	(if (< (cadr ustate) minbet)
-	    (begin 
-	      (display "You don't have enough to play. :(")    
-	      (playloop (cons (playerstate (car ustate)
-					   (cadr ustate)
-					   (caddr ustate)
-					   #f)
-			      (computer-play states))))
-	    (begin 
-	      (display "Do you want to [p]lay, [f]old or (side)[s]how?")
-	      (case (user-play/fold/show)
-		((p) 
-		 (let ((bet (input-userbet)))
-		   (set! minbet bet)
-		   (playloop (cons (playerstate (car ustate)
-						(- (cadr ustate) bet)
-					      (caddr ustate) 
-					      #t)
-				 (computer-play (cdr states))))))
-		((f)
-		 (playloop (cons (playerstate (car ustate)
-					      (cadr ustate)
-					      (caddr ustate)
-					      #f)
-				 (computer-play (cdr states)))))))))))))
-	      
- (define (computer-play i h opps)
-   (let ((cash (get-comp-cash i)))
-     (if (play? h opps bet cash)
-	 (begin
-	   (display "Computer i decided to play.")
-	   (set-comp-cash! (- cash minbet)))
-	 (display "Computer folded."))))
 
  (define (interval from to)
    (letrec ((r (lambda (lst f t)
@@ -244,95 +192,112 @@
 		     (r (cons t lst) f (sub1 t))))))
      (r '() from to)))
 
- (define (set-opp-cash n)
-   (map 
-    (lambda (n) 
-      (hash-set! computercash n 500))
-    (interval '() 0 n)))
-
- (define (playgame)
-   (display "Welcome to Flush!!")
-   (let ((opps (input-opponents)))
-     (playround (input-opponents))))
-
- (define (game)
+ (define (gamep)
    (display "Welcome to Flush")
-   (let ((opps (input-opponents)))
+   (let ((opps (input-opponents 3 7)))
      (let ((money (map (lambda (n) 500) (interval 0 opps))))
        (round money))))
 
+(define (round money)
+  (let ((hs (distribute-cards (length money)))
+	(pot 0)
+	(minbet 20)
+	(playing? (map (lambda (m) #t) money)))
+    (letrec ((playermove 
+	      (lambda (pt mbet p? ms h)
+		(when (< (stillin p?) 2)
+		    (round (map (lambda (p m) (if p (+ m pot) m)) p? ms)))
+		(if (not (car p?))
+		    (computermove pt
+				  mbet
+				  (cdr hs)
+				  p?
+				  ms
+				  (cons #f '())
+				  (cons (car ms) '()))
+		    (begin
+		      (display "\nyour hand")
+		      (display h)
+		      (display "\ncash in hand: ")
+		      (display (number->string (car ms)))
+		      (display "\nsize of pot: ")
+		      (display (number->string pt))
+		      (display "\n number of players:")
+		      (display (number->string (stillin p?)))
+		      (if (< (car ms) mbet)
+			  (begin
+			    (display "\nsorry not enough money")
+			    (computermove pt
+					  mbet
+					  (cdr hs)
+					  p?
+					  ms
+					  (cons #f '())
+					  (cons (car ms) '())))
+			  (begin 
+			    (display "\nDo you want to [p]lay, [f]old or (side)[s]how?")
+			    (case (input-play/fold/show)
+			      ((p) 
+			       (let ((ubet (input-userbet mbet (car ms))))
+				 (computermove (+ pt ubet) 
+					       ubet 
+					       (cdr hs) 
+					       p?
+					       ms
+					       (cons #t '())
+					       (cons (- (car ms) ubet) '()))))
+			      ((f) (computermove pot
+						 mbet
+						 (cdr hs)
+						 p?
+						 ms
+						 (cons #f '())
+						 (cons (car ms) '())))
+			      ((s) 
+			       (let ((winn (winsall hs)))
+				 (display "\n The winning hand: ")
+				 (display winn)
+				 (round (map (lambda (m h)
+					       (if (eq? h winn)
+						   (+ m pot)
+						   m))
+					     ms hs)))))))))))
+	     (stillin (lambda (p?) (length (filter (lambda (x) x) p?))))
+	     (computermove 
+		 (lambda (pt mbet hds p? ms newplaying? newms)
+		   (if  (null? hds) 
+			(playermove pt mbet (reverse newplaying?) (reverse newms) (car hs))
+			(if (car p?)
+			    (if (play? (car hds) (stillin p?) mbet (car ms))
+				(begin
+				  (display "\ncomputer played.")
+				  (computermove (+ pt mbet) 
+						mbet
+						(cdr hds)
+						(cdr p?)
+						(cdr ms)
+						(cons #t newplaying?)
+						(cons (- (car ms) mbet) newms)))
+				(begin
+				  (display "\ncomputer folded.")
+				  (computermove pt
+						mbet
+						(cdr hds)
+						(cdr p?)
+						(cdr ms)
+						(cons #f newplaying?)
+						(cons (car ms) newms))))
+			    (computermove pt
+					  mbet
+					  (cdr hds)
+					  (cdr p?)
+					  (cdr ms)
+					  (cons #f newplaying?)
+					  (cons (car ms) newms)))))))
+      (playermove pot minbet playing? money (car hs)))))
 
- (define (round money)
-   (let ((hs (distribute-cards (length money)))
-	 (pot 0)
-	 (minbet 20)
-	 (playing? (map (lambda (m) #t) money)))
-     (letrec ((playermove 
-	       (lambda (pot minibet h)
-		 (display "your hand")
-		 (display h)
-		 (display "cash in hand: ")
-		 (display (number->string (car money)))
-		 (if (< (car money) minbet)
-		     (begin
-		       (display "sorry not enough money")
-		       'fold)
-		     (begin 
-		       (display "Do you want to [p]lay, [f]old or (side)[s]how?")
-		       (case (input-play/fold/show)
-			 ((p) (input-userbet))
-			 ((f) 'fold)
-			 ((s) 'show))))))
-	      (computermoves 
-	       (lambda (pot minbet money playing? hs)
-		 (if (null? hs)
-		     '()
-		     (if (play? (car hs) 
-				(length money)
-				minbet
-				(car money))
-			 (cons minbet (computermoves (+ pot minbet)
-						 (cdr money)
-						 (cdr playing?)
-						 (cdr hs)))
-			 (cons 'fold (computermoves pot
-						 minbet
-						 (cdr money)
-						 (cdr playing?)
-						 (cdr hs)))))))
-	      (leup 
-	       (lambda (money pot minbid playing?)
-		 (let ((pmove (playermove pot minibet (car hs))))
-		   (cond
-		    ((number? pmove) (computermoves (+ pot pmove)
-						    pmove
-						    (cdr money)
-						    (cdr playing?)
-						    (cdr hs)))
 
-
-	
-	
-      
-
-
-			
-
-		    
-
-		      
-		      
-
-		    
-		
-			   
-		       
-		      
-
-    
-    
-
-(define (playerstate pos cash hand playing?)
-  (list pos cash hand playing?))
-
+	       
+		 
+		     
 
