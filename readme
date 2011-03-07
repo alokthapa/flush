@@ -1,0 +1,34 @@
+
+
+Probabilities of flush
+
+There are 3 cards dealt, so the total combination is 
+C(52, 3) = 52!/ (52-3)! 3!  = 52!/ (49!*3!) = 52* 51*50/ 6 = 22100
+
+total number of triples => A, K, Q... 2 = 13 i.e. 13/ 22100 = 0.00058 
+
+total number of doubleruns => A23, AKQ ,KQJ, QJ10, J109, 1098, 987, 876,765,654,543,432 = 12*4 = 48/22100 = 0.00217
+
+
+
+
+
+
+Some Thoughts 
+
+Application of Bayes' Rule which says
+
+P(B|A) = P(A|B)*P(B)/ P(A)
+
+let B be chances of wining, let A be the chances of a hand winnning.
+
+Knowns: 
+P(A) = We can figure out A, by calculating the probability of a winning hand.
+P(B) =  supposing all cards are dealt equally, P(B) = 1/(number of players)
+P(A|B) = probability that 
+
+Lets apply this to two players!
+
+P(chances winning) = 1/2
+P(chances winning hand) = can be calculated
+P(chances of winning | 
