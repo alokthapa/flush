@@ -246,7 +246,7 @@
 					       ms
 					       (cons #t '())
 					       (cons (- (car ms) ubet) '()))))
-			      ((f) (computermove pot
+			      ((f) (computermove pt
 						 mbet
 						 (cdr hs)
 						 p?
@@ -268,7 +268,7 @@
 		   (if  (null? hds) 
 			(playermove pt mbet (reverse newplaying?) (reverse newms) (car hs))
 			(if (car p?)
-			    (if (play? (car hds) (stillin p?) mbet (car ms))
+			    (if (and (> (car ms) mbet) (play? (car hds) (stillin p?) mbet (car ms)))
 				(begin
 				  (display "\ncomputer played.")
 				  (computermove (+ pt mbet) 
